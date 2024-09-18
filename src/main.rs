@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, BufWriter, Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::net::{TcpListener, TcpStream};
 
 #[derive(Debug)]
@@ -10,7 +10,9 @@ enum HttpVersion {
     V3_0,
 }
 
-fn parse_request_line(request_line: &str) -> Result<(String, String, HttpVersion), &'static str> {
+fn parse_request_line(
+    request_line: &str,
+) -> Result<(String, String, HttpVersion), &'static str> {
     let parts: Vec<_> = request_line.split_ascii_whitespace().collect();
 
     if parts.len() != 3 {
@@ -30,8 +32,9 @@ fn parse_request_line(request_line: &str) -> Result<(String, String, HttpVersion
     Ok((verb.to_string(), path.to_string(), version))
 }
 
-fn handle_client(stream: &TcpStream) -> Result<(String, String, HttpVersion), String> {
-    println!("new connection!");
+fn handle_client(
+    stream: &TcpStream,
+) -> Result<(String, String, HttpVersion), String> {
     let buf = BufReader::new(stream);
     let mut lines = buf.lines();
 
@@ -43,6 +46,22 @@ fn handle_client(stream: &TcpStream) -> Result<(String, String, HttpVersion), St
     Ok(parse_request_line(&request_line)?)
 }
 
+fn write_http<T: ?Sized + Write>(
+    writer: &mut BufWriter<T>,
+    headers: &str,
+    content: &str,
+) {
+    let _headers = headers;
+    if headers.is_empty() {
+        let _headers = &format!("\r\n{headers}").to_string();
+    }
+    let length = content.len();
+    let _ = writer.write_all(
+        format!("HTTP/1.1 200 OK\r\nContent-Length: {length}{_headers}\r\n\r\n{content}")
+            .as_bytes(),
+    );
+}
+
 fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:4000").unwrap();
 
@@ -50,20 +69,15 @@ fn main() -> std::io::Result<()> {
         let stream = stream?;
         let mut writer = BufWriter::new(&stream);
         match handle_client(&stream) {
-            Ok((verb, path, http_version)) => {
-                //let content = format!("verb: {verb}, path: {path}, version: {http_version:?}");
-                let content = format!("<html><h1>{verb} on {path}</h1></html>");
-                let length = content.len();
-                let _ = writer.write_all(
-                    format!("HTTP/1.1 200 OK\r\nContent-Length: {length}\r\n\r\n{content}",)
-                        .as_bytes(),
+            Ok((verb, path, _)) => {
+                write_http(
+                    &mut writer,
+                    "",
+                    &format!("<html><h1>{verb} on {path}</h1></html>"),
                 );
             }
             Err(err) => {
-                let length = err.len();
-                let _ = writer.write_all(
-                    format!("HTTP/1.1 200 OK\r\nContent-Length: {length}\r\n\r\n{err}",).as_bytes(),
-                );
+                write_http(&mut writer, "", &err);
             }
         }
     }
