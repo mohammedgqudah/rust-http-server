@@ -5,7 +5,7 @@ use std::net::{TcpListener, ToSocketAddrs};
 
 pub struct Server {
     listener: TcpListener,
-    paths: std::collections::HashMap<String, Box<dyn Fn(Request) -> String>>,
+    paths: std::collections::HashMap<String, Box<dyn Fn(&Request) -> String>>,
 }
 
 impl Server {
@@ -22,12 +22,20 @@ impl Server {
             let mut writer = BufWriter::new(&stream);
             let request = Request::from(&stream).unwrap();
             if let Some(handler) = self.paths.get(&request.path) {
-                let content = handler(request);
-                let resp = format!("HTTP 200 OK\r\nContent-Length:{}\r\n\r\n{content}", content.len());
+                let content = handler(&request);
+                let resp = format!(
+                    "{} 200 OK\r\nContent-Length:{}\r\n\r\n{content}",
+                    request.http_version,
+                    content.len()
+                );
                 let _ = writer.write_all(resp.as_bytes());
             } else {
                 let content = format!("<h1>404, Page {} not found.</h1>", request.path);
-                let resp = format!("HTTP 404 NOT FOUND\r\nContent-Length:{}\r\n\r\n{content}", content.len());
+                let resp = format!(
+                    "{} 404 NOT FOUND\r\nContent-Length:{}\r\n\r\n{content}",
+                    request.http_version,
+                    content.len()
+                );
                 let _ = writer.write_all(resp.as_bytes());
             }
             println!("Connection closed");
@@ -38,7 +46,7 @@ impl Server {
 
     pub fn get<F>(&mut self, path: &'static str, handler: F) -> &mut Self
     where
-        F: Fn(Request) -> String + 'static,
+        F: Fn(&Request) -> String + 'static,
     {
         self.paths.insert(path.to_string(), Box::new(handler));
         self
