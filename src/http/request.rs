@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::net::TcpStream;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ pub enum HttpVersion {
 
 pub struct Request<'a> {
     pub headers: Option<HashMap<String, String>>,
-    pub body: &'a str,
+    pub body: Option<Vec<u8>>,
     pub path: String,
     pub query_string: &'a str,
     pub http_version: HttpVersion,
@@ -37,8 +37,8 @@ impl std::fmt::Display for HttpVersion {
 
 impl<'a> Request<'a> {
     pub fn from(stream: &TcpStream) -> Result<Self, String> {
-        let buf = BufReader::new(stream);
-        let mut lines = buf.lines();
+        let mut buf = BufReader::new(stream);
+        let mut lines = buf.by_ref().lines();
 
         let request_line = lines
             .next()
@@ -46,9 +46,13 @@ impl<'a> Request<'a> {
             .map_err(|_| "Couldn't get request line")?;
 
         let mut lines = lines
+            // TODO: don't use unwrap
             .take_while(|line| !line.as_ref().unwrap().is_empty())
             .peekable();
 
+        // TODO: Parse headers only when asked to.
+        // This will pose a challenge to internally used headers such as Content-Length,
+        // but this can be solved by saving the headers we're interested in as a variable or struct.
         let headers = match lines.peek() {
             None => None,
             Some(_) => {
@@ -57,6 +61,8 @@ impl<'a> Request<'a> {
                     let binding = line.map_err(|_| "Expected a header".to_string())?;
                     let mut pair = binding.split(':');
                     if let (Some(key), Some(value)) = (pair.next(), pair.next()) {
+                        // TODO: Store headers in lower-case.
+                        // TODO: Store both `Referer` and `Referrer`
                         map.insert(key.to_string(), value.trim().to_string());
                         Ok(())
                     } else {
@@ -66,12 +72,31 @@ impl<'a> Request<'a> {
                 Some(map)
             }
         };
+        let body = match headers {
+            None => None,
+            Some(ref headers) => {
+                if let Some(length) = headers.get("Content-Length") {
+                    // TODO: Handle isize::MAX and a max body size.
+                    let length = length
+                        .parse()
+                        .map_err(|_| "Content-Length is not a number")?;
+                    let mut body = Vec::with_capacity(length);
+                    unsafe {
+                        body.set_len(length);
+                    };
+                    buf.read_exact(&mut body).map_err(|_| "todo")?;
+                    Some(body)
+                } else {
+                    None
+                }
+            }
+        };
 
-        let (verb, uri, version) = parse_request_line(&request_line)?;
+        let (_verb, uri, version) = parse_request_line(&request_line)?;
 
         Ok(Request {
             headers: headers,
-            body: "",
+            body: body,
             path: uri,
             query_string: "",
             http_version: version,
