@@ -25,15 +25,23 @@ impl Server {
 
             if let Some(handler) = &self.handler {
                 let response = handler(&request);
+
+                let mut headers = response.headers.headers;
+                if !headers.is_empty() {
+                    headers.insert_str(0, "\r\n");
+                }
+
                 let resp = format!(
-                    "{http_version} {status_number} {status_description}\r\nContent-Length: {len}\r\n\r\n",
+                    "{http_version} {status_number} {status_description}\r\nContent-Length: {len}{headers}\r\n\r\n",
                     http_version = request.http_version,
                     status_number = response.status as u16,
                     status_description = response.status,
+                    headers = headers,
                     len = response.body.len(),
                 );
-                let _ = writer.write_all(resp.as_bytes());
-                let _ = writer.write_all(&response.body);
+
+                let _ = writer.write_all(resp.as_bytes()); // status line + headers
+                let _ = writer.write_all(&response.body); // body
             }
 
             println!("Connection closed");

@@ -100,6 +100,7 @@ impl FromStr for Method {
 
 impl<'a> Request<'a> {
     pub fn from(stream: &TcpStream) -> Result<Self, String> {
+        // TODO: Support url-encoding
         let mut buf = BufReader::new(stream);
         let mut lines = buf.by_ref().lines();
 

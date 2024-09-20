@@ -6,17 +6,26 @@ pub struct Headers {
 }
 
 impl Headers {
+    #[allow(dead_code)]
     pub fn from_hash_map(map: &HashMap<String, String>) -> Self {
         let headers = map
             .iter()
             .map(|(k, v)| format!("{}: {}", k, v))
             .collect::<Vec<_>>()
             .join(", ");
-        Headers { headers: headers }
+
+        Self::new(&headers)
+    }
+
+    pub fn new(headers: &str) -> Self {
+        Headers {
+            headers: headers.to_string(),
+        }
     }
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub enum Status {
     // Informational responses (100–199)
     Continue = 100,
@@ -160,4 +169,14 @@ pub struct Response {
     pub headers: Headers,
     pub body: Vec<u8>,
     pub status: Status,
+}
+
+impl Response {
+    pub fn new(status: Status, headers: Headers, body: Vec<u8>) -> Self {
+        Response {
+            headers: headers,
+            body: body,
+            status: status,
+        }
+    }
 }

@@ -10,11 +10,14 @@ fn headers(request: &Request) -> Response {
     match (request.path.as_str(), &request.method) {
         ("/headers", Method::GET) => Response {
             body: fs::read("src/static/headers.html").expect("ON"),
-            headers: Headers {
-                headers: String::new(),
-            },
+            headers: Headers::new("X-Server: RustHTTP"),
             status: Status::Ok,
         },
+        ("/redirect", Method::GET) => Response::new(
+            Status::TemporaryRedirect,
+            Headers::new("Location: /login"),
+            Vec::new(),
+        ),
         ("/headers", Method::POST) => {
             let body = request.body.clone().unwrap_or_else(|| "Nothing".into());
             let body = String::from_utf8(body).unwrap_or_else(|_| "not utf8".to_string());
