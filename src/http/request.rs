@@ -72,6 +72,7 @@ impl<'a> Request<'a> {
                 Some(map)
             }
         };
+        // TODO: Handle Transfer-Encoding: Chunked
         let body = match headers {
             None => None,
             Some(ref headers) => {
