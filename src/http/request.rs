@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Seek};
 use std::net::TcpStream;
 use std::str::FromStr;
 
@@ -151,6 +151,47 @@ impl<'a> Request<'a> {
                     };
                     buf.read_exact(&mut body).map_err(|_| "todo")?;
                     Some(body)
+                } else if let Some(encoding) =
+                    headers.get("Transfer-Encoding").map(|h| h.to_lowercase())
+                {
+                    if encoding.as_str() == "chunked" {
+                        let mut body: Vec<u8> = Vec::new();
+                        let mut chunk_size: usize;
+                        let mut line = String::new();
+                        buf.read_line(&mut line)
+                            .map_err(|_| "Expected chunk size")?;
+                        line = line.trim().to_string();
+                        println!("YO: {}", line);
+                        chunk_size = u64::from_str_radix(&line, 16)
+                            .map_err(|_| "Invalid chunk size")?
+                            as usize;
+                        while chunk_size != 0 {
+                            let mut chunk: Vec<u8> = Vec::with_capacity(chunk_size);
+                            unsafe {
+                                chunk.set_len(chunk_size);
+                            }
+                            buf.read_exact(&mut chunk).map_err(|_| "Expected a chunk")?;
+                            body.append(&mut chunk);
+                            println!("pushed {} into body", chunk_size);
+                            let mut line = String::new();
+                            let mut x = [0; 2];
+                            let _ = buf.read_exact(&mut x);
+                            buf.read_line(&mut line)
+                                .map_err(|_| "Expected chunk size")?;
+                            line = line.trim().to_string();
+                            println!("YO:{} -> {}", line, line.len());
+                            println!(
+                                "body so far {}",
+                                String::from_utf8(body.clone()).unwrap()
+                            );
+                            chunk_size = u64::from_str_radix(&line, 16)
+                                .map_err(|_| "Invalid chunk size")?
+                                as usize;
+                        }
+                        Some(body)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
