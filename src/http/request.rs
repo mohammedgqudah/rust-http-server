@@ -18,6 +18,7 @@ pub struct Request<'a> {
     pub path: String,
     pub query_string: &'a str,
     pub http_version: HttpVersion,
+    pub method: Method,
 }
 
 impl std::fmt::Display for HttpVersion {
@@ -47,6 +48,52 @@ impl FromStr for HttpVersion {
             "HTTP/2.0" => Ok(HttpVersion::V2_0),
             "HTTP/3.0" => Ok(HttpVersion::V3_0),
             _ => Err("Unknown HTTP version"),
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub enum Method {
+    HEAD,
+    GET,
+    OPTIONS,
+    POST,
+    PUT,
+    PATCH,
+    DELETE,
+}
+
+impl std::fmt::Display for Method {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Method::GET => "GET",
+                Method::HEAD => "HEAD",
+                Method::OPTIONS => "OPTIONS",
+                Method::POST => "POST",
+                Method::PUT => "PUT",
+                Method::PATCH => "PATCH",
+                Method::DELETE => "DELETE",
+            }
+        )
+    }
+}
+
+impl FromStr for Method {
+    type Err = &'static str;
+
+    fn from_str(input: &str) -> Result<Method, Self::Err> {
+        match input {
+            "GET" => Ok(Method::GET),
+            "HEAD" => Ok(Method::HEAD),
+            "OPTIONS" => Ok(Method::OPTIONS),
+            "POST" => Ok(Method::POST),
+            "PUT" => Ok(Method::PUT),
+            "PATCH" => Ok(Method::PATCH),
+            "DELETE" => Ok(Method::DELETE),
+            _ => Err("Invalid HTTP Method"),
         }
     }
 }
@@ -109,7 +156,7 @@ impl<'a> Request<'a> {
             }
         };
 
-        let (_verb, uri, version) = parse_request_line(&request_line)?;
+        let (method, uri, version) = parse_request_line(&request_line)?;
 
         Ok(Request {
             headers: headers,
@@ -117,22 +164,23 @@ impl<'a> Request<'a> {
             path: uri,
             query_string: "",
             http_version: version,
+            method: method,
         })
     }
 }
 
 fn parse_request_line(
     request_line: &str,
-) -> Result<(String, String, HttpVersion), &'static str> {
+) -> Result<(Method, String, HttpVersion), &'static str> {
     let parts: Vec<_> = request_line.split_ascii_whitespace().collect();
 
     if parts.len() != 3 {
         return Err("Invalid request line");
     }
 
-    let verb = parts[0];
+    let method = Method::from_str(parts[0])?;
     let path = parts[1];
     let version = HttpVersion::from_str(parts[2])?;
 
-    Ok((verb.to_string(), path.to_string(), version))
+    Ok((method, path.to_string(), version))
 }

@@ -1,18 +1,18 @@
 use super::request::Request;
-use std::collections::HashMap;
+use super::response::Response;
 use std::io::{BufWriter, Write};
 use std::net::{TcpListener, ToSocketAddrs};
 
 pub struct Server {
     listener: TcpListener,
-    paths: std::collections::HashMap<String, Box<dyn Fn(&Request) -> String>>,
+    handler: Option<Box<dyn Fn(&Request) -> Response>>,
 }
 
 impl Server {
     pub fn new<A: ToSocketAddrs>(addr: A) -> Self {
         Server {
             listener: TcpListener::bind(addr).unwrap(),
-            paths: HashMap::new(),
+            handler: None,
         }
     }
 
@@ -22,34 +22,31 @@ impl Server {
             let stream = stream?;
             let mut writer = BufWriter::new(&stream);
             let request = Request::from(&stream).unwrap();
-            if let Some(handler) = self.paths.get(&request.path) {
-                let content = handler(&request);
+
+            if let Some(handler) = &self.handler {
+                let response = handler(&request);
                 let resp = format!(
-                    "{} 200 OK\r\nContent-Length:{}\r\n\r\n{content}",
-                    request.http_version,
-                    content.len()
+                    "{http_version} {status_number} {status_description}\r\nContent-Length: {len}\r\n\r\n",
+                    http_version = request.http_version,
+                    status_number = response.status as u16,
+                    status_description = response.status,
+                    len = response.body.len(),
                 );
                 let _ = writer.write_all(resp.as_bytes());
-            } else {
-                let content = format!("<h1>404, Page {} not found.</h1>", request.path);
-                let resp = format!(
-                    "{} 404 NOT FOUND\r\nContent-Length:{}\r\n\r\n{content}",
-                    request.http_version,
-                    content.len()
-                );
-                let _ = writer.write_all(resp.as_bytes());
+                let _ = writer.write_all(&response.body);
             }
+
             println!("Connection closed");
         }
 
         Ok(())
     }
 
-    pub fn get<F>(&mut self, path: &'static str, handler: F) -> &mut Self
+    pub fn on_request<F>(&mut self, handler: F) -> &mut Self
     where
-        F: Fn(&Request) -> String + 'static,
+        F: Fn(&Request) -> Response + 'static,
     {
-        self.paths.insert(path.to_string(), Box::new(handler));
+        self.handler = Some(Box::new(handler));
         self
     }
 }

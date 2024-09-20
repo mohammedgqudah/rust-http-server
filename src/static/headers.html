@@ -1,0 +1,23 @@
+<html>
+	<body>
+		<h1>application/x-www-form-urlencoded</h1>
+		<form method="POST" action="/headers">
+			<label for="name">Name</label>
+			<input name="name"/>
+			<label for="email">email</label>
+			<input name="email"/>
+			<button>submit</button>
+		</form>
+
+		<hr/>
+
+		<h1>multipart/form-data</h1>
+		<form method="POST" action="/headers" enctype="multipart/form-data">
+			<label for="name">Name</label>
+			<input name="name"/>
+			<label for="email">email</label>
+			<input name="email"/>
+			<button>submit</button>
+		</form>
+	</body>
+</html
