@@ -17,6 +17,7 @@ impl Server {
     }
 
     pub fn listen(&self) -> std::io::Result<()> {
+        // TODO: Allow connections to be re-used.
         for stream in self.listener.incoming() {
             let stream = stream?;
             let mut writer = BufWriter::new(&stream);

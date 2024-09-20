@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
 use std::net::TcpStream;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub enum HttpVersion {
@@ -32,6 +33,21 @@ impl std::fmt::Display for HttpVersion {
                 HttpVersion::V3_0 => "HTTP/3.0",
             }
         )
+    }
+}
+
+impl FromStr for HttpVersion {
+    type Err = &'static str;
+
+    fn from_str(input: &str) -> Result<HttpVersion, Self::Err> {
+        match input {
+            "HTTP/0.9" => Ok(HttpVersion::V0_9),
+            "HTTP/1.0" => Ok(HttpVersion::V1_0),
+            "HTTP/1.1" => Ok(HttpVersion::V1_1),
+            "HTTP/2.0" => Ok(HttpVersion::V2_0),
+            "HTTP/3.0" => Ok(HttpVersion::V3_0),
+            _ => Err("Unknown HTTP version"),
+        }
     }
 }
 
@@ -116,13 +132,7 @@ fn parse_request_line(
 
     let verb = parts[0];
     let path = parts[1];
-    let version = match parts[2] {
-        "HTTP/0.9" => HttpVersion::V0_9,
-        "HTTP/1.0" => HttpVersion::V1_0,
-        "HTTP/1.1" => HttpVersion::V1_1,
-        "HTTP/2.0" => HttpVersion::V2_0,
-        "HTTP/3.0" => HttpVersion::V3_0,
-        _ => return Err("Unknown HTTP version"),
-    };
+    let version = HttpVersion::from_str(parts[2])?;
+
     Ok((verb.to_string(), path.to_string(), version))
 }
