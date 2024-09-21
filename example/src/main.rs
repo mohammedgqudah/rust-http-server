@@ -1,4 +1,3 @@
-mod http;
 use http::{
     request::{Method, Request},
     response::{Headers, Response, Status},
@@ -9,7 +8,7 @@ use std::fs;
 fn headers(request: &Request) -> Response {
     match (request.path.as_str(), &request.method) {
         ("/headers", Method::Get) => Response {
-            body: fs::read("src/static/headers.html").expect("ON"),
+            body: fs::read("example/src/static/headers.html").expect("ON"),
             headers: Headers::new("X-Server: RustHTTP"),
             status: Status::Ok,
         },
