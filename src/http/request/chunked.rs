@@ -1,11 +1,8 @@
+/// Chunked Transfer Decoder
+/// RFC: https://datatracker.ietf.org/doc/html/rfc9112#section-7.1
+///
+use super::body::{BodyDecoder, Chunk};
 use std::io::BufRead;
-
-#[allow(dead_code)]
-#[derive(Debug, PartialEq)]
-pub struct Chunk {
-    pub buf: Vec<u8>,
-    pub extension: String,
-}
 
 pub struct ChunkedDecoder<'a> {
     buf: &'a mut dyn BufRead,
@@ -35,7 +32,10 @@ impl<'a> Iterator for ChunkedDecoder<'a> {
 
         match self.buf.read_line(&mut line) {
             Ok(_) => {}
-            Err(_) => return Some(Err("Expected chunk size")),
+            Err(_) => {
+                self.stopped = true;
+                return Some(Err("Expected chunk size"));
+            }
         };
 
         let line = line.trim();
@@ -46,8 +46,15 @@ impl<'a> Iterator for ChunkedDecoder<'a> {
             return None;
         }
 
-        // TODO: Start parsing optional chunk extensions
-        let chunk_size = match u64::from_str_radix(line, 16) {
+        // Optionally read the chunk extension
+        // https://datatracker.ietf.org/doc/html/rfc9112#section-7.1.1
+        let (length, extension) = match line.split_once(';') {
+            None => (line, ""),
+            // trim the the first part because a BWS is allowed
+            Some((length, extension)) => (length.trim(), extension.trim()),
+        };
+
+        let chunk_size = match u64::from_str_radix(length, 16) {
             Ok(size) => size as usize,
             Err(_) => {
                 self.stopped = true;
@@ -63,7 +70,10 @@ impl<'a> Iterator for ChunkedDecoder<'a> {
 
         match self.buf.read_exact(&mut chunk) {
             Ok(_) => {}
-            Err(_) => return Some(Err("Expected a chunk")),
+            Err(_) => {
+                self.stopped = true;
+                return Some(Err("Expected a chunk"));
+            }
         };
 
         let mut _skip = [0; 2];
@@ -71,10 +81,11 @@ impl<'a> Iterator for ChunkedDecoder<'a> {
 
         Some(Ok(Chunk {
             buf: chunk,
-            extension: String::new(),
+            extension: extension.to_string(),
         }))
     }
 }
+impl<'a> BodyDecoder for ChunkedDecoder<'a> {}
 
 #[cfg(test)]
 mod test {
@@ -86,17 +97,17 @@ mod test {
         let expected = vec![
             Chunk {
                 buf: "Hello".as_bytes().to_vec(),
-                extension: String::new(),
+                extension: "name_only;key1=value1".to_string(),
             },
             Chunk {
                 buf: "This is exactly 18".as_bytes().to_vec(),
-                extension: String::new(),
+                extension: "one_key".to_string(),
             },
         ];
         let body = String::from(
-            r"5
+            r"5; name_only;key1=value1 
 Hello
-12
+12; one_key
 This is exactly 18
 0
 

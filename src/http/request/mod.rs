@@ -1,3 +1,4 @@
+pub mod body;
 pub mod chunked;
 
 use chunked::ChunkedDecoder;
@@ -150,11 +151,8 @@ impl<'a> Request<'a> {
                     let length = length
                         .parse()
                         .map_err(|_| "Content-Length is not a number")?;
-                    let mut body = Vec::with_capacity(length);
-                    unsafe {
-                        body.set_len(length);
-                    };
-                    buf.read_exact(&mut body).map_err(|_| "todo")?;
+                    let mut body = vec![0; length];
+                    buf.read_exact(&mut body).map_err(|_| "Expected a body")?;
                     Some(body)
                 } else if let Some(encoding) =
                     headers.get("Transfer-Encoding").map(|h| h.to_lowercase())
@@ -163,9 +161,9 @@ impl<'a> Request<'a> {
                     if encoding.as_str() == "chunked" {
                         let mut body: Vec<u8> = Vec::new();
                         ChunkedDecoder::new(&mut buf)
-                            .filter(|c| c.is_ok())
-                            .for_each(|c| {
-                                body.append(&mut c.unwrap().buf);
+                            .filter_map(Result::ok)
+                            .for_each(|mut c| {
+                                body.append(&mut c.buf);
                             });
                         Some(body)
                     } else {
