@@ -40,6 +40,7 @@ pub enum Status {
     NoContent = 204,
     ResetContent = 205,
     PartialContent = 206,
+    #[allow(clippy::enum_variant_names)]
     MultiStatus = 207,
     AlreadyReported = 208,
     ImUsed = 226,
@@ -174,9 +175,9 @@ pub struct Response {
 impl Response {
     pub fn new(status: Status, headers: Headers, body: Vec<u8>) -> Self {
         Response {
-            headers: headers,
-            body: body,
-            status: status,
+            headers,
+            body,
+            status,
         }
     }
 }

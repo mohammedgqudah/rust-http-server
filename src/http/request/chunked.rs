@@ -13,7 +13,7 @@ pub struct ChunkedDecoder<'a> {
 impl<'a> ChunkedDecoder<'a> {
     pub fn new(buf: &'a mut dyn BufRead) -> Self {
         ChunkedDecoder {
-            buf: buf,
+            buf,
             stopped: false,
         }
     }

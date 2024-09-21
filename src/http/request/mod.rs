@@ -60,13 +60,13 @@ impl FromStr for HttpVersion {
 
 #[derive(PartialEq)]
 pub enum Method {
-    HEAD,
-    GET,
-    OPTIONS,
-    POST,
-    PUT,
-    PATCH,
-    DELETE,
+    Head,
+    Get,
+    Options,
+    Post,
+    Put,
+    Patch,
+    Delete,
 }
 
 impl std::fmt::Display for Method {
@@ -75,13 +75,13 @@ impl std::fmt::Display for Method {
             f,
             "{}",
             match self {
-                Method::GET => "GET",
-                Method::HEAD => "HEAD",
-                Method::OPTIONS => "OPTIONS",
-                Method::POST => "POST",
-                Method::PUT => "PUT",
-                Method::PATCH => "PATCH",
-                Method::DELETE => "DELETE",
+                Method::Get => "GET",
+                Method::Head => "HEAD",
+                Method::Options => "OPTIONS",
+                Method::Post => "POST",
+                Method::Put => "PUT",
+                Method::Patch => "PATCH",
+                Method::Delete => "DELETE",
             }
         )
     }
@@ -92,13 +92,13 @@ impl FromStr for Method {
 
     fn from_str(input: &str) -> Result<Method, Self::Err> {
         match input {
-            "GET" => Ok(Method::GET),
-            "HEAD" => Ok(Method::HEAD),
-            "OPTIONS" => Ok(Method::OPTIONS),
-            "POST" => Ok(Method::POST),
-            "PUT" => Ok(Method::PUT),
-            "PATCH" => Ok(Method::PATCH),
-            "DELETE" => Ok(Method::DELETE),
+            "GET" => Ok(Method::Get),
+            "HEAD" => Ok(Method::Head),
+            "OPTIONS" => Ok(Method::Options),
+            "POST" => Ok(Method::Post),
+            "PUT" => Ok(Method::Put),
+            "PATCH" => Ok(Method::Patch),
+            "DELETE" => Ok(Method::Delete),
             _ => Err("Invalid HTTP Method"),
         }
     }
@@ -178,12 +178,12 @@ impl<'a> Request<'a> {
         let (method, uri, version) = parse_request_line(&request_line)?;
 
         Ok(Request {
-            headers: headers,
-            body: body,
+            headers,
+            body,
             path: uri,
             query_string: "",
             http_version: version,
-            method: method,
+            method,
         })
     }
 }

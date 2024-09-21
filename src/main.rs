@@ -8,17 +8,17 @@ use std::fs;
 
 fn headers(request: &Request) -> Response {
     match (request.path.as_str(), &request.method) {
-        ("/headers", Method::GET) => Response {
+        ("/headers", Method::Get) => Response {
             body: fs::read("src/static/headers.html").expect("ON"),
             headers: Headers::new("X-Server: RustHTTP"),
             status: Status::Ok,
         },
-        ("/redirect", Method::GET) => Response::new(
+        ("/redirect", Method::Get) => Response::new(
             Status::TemporaryRedirect,
             Headers::new("Location: /login"),
             Vec::new(),
         ),
-        ("/headers", Method::POST) => {
+        ("/headers", Method::Post) => {
             let body = request.body.clone().unwrap_or_else(|| "Nothing".into());
             let body = String::from_utf8(body).unwrap_or_else(|_| "not utf8".to_string());
 

@@ -3,9 +3,11 @@ use super::response::Response;
 use std::io::{BufWriter, Write};
 use std::net::{TcpListener, ToSocketAddrs};
 
+pub type Handler = Option<Box<dyn Fn(&Request) -> Response>>;
+
 pub struct Server {
     listener: TcpListener,
-    handler: Option<Box<dyn Fn(&Request) -> Response>>,
+    handler: Handler
 }
 
 impl Server {
