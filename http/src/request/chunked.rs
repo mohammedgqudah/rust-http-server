@@ -1,17 +1,16 @@
-/// Chunked Transfer Decoder
-/// RFC: https://datatracker.ietf.org/doc/html/rfc9112#section-7.1
-///
 use super::body::{BodyDecoder, Chunk};
 use std::io::BufRead;
 
-pub struct ChunkedDecoder<'a> {
-    buf: &'a mut dyn BufRead,
+/// A Chunked Transfer Decoder
+/// RFC: <https://datatracker.ietf.org/doc/html/rfc9112#section-7.1>
+pub struct ChunkedDecoder<A: BufRead> {
+    buf: A,
     stopped: bool,
 }
 
 #[allow(dead_code)]
-impl<'a> ChunkedDecoder<'a> {
-    pub fn new(buf: &'a mut dyn BufRead) -> Self {
+impl<A: BufRead> ChunkedDecoder<A> {
+    pub fn new(buf: A) -> Self {
         ChunkedDecoder {
             buf,
             stopped: false,
@@ -19,7 +18,7 @@ impl<'a> ChunkedDecoder<'a> {
     }
 }
 
-impl<'a> Iterator for ChunkedDecoder<'a> {
+impl<A: BufRead> Iterator for ChunkedDecoder<A> {
     type Item = Result<Chunk, &'static str>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -62,6 +61,9 @@ impl<'a> Iterator for ChunkedDecoder<'a> {
             }
         };
 
+        // TODO: Instead of stopping the iterator,
+        // an empty chunk should be returned. This is because the last chunk
+        // is allowed to have an extension, which may be relevant to the handler.
         if chunk_size == 0 {
             return None;
         }
@@ -76,6 +78,7 @@ impl<'a> Iterator for ChunkedDecoder<'a> {
             }
         };
 
+        // Read CR LF
         let mut _skip = [0; 2];
         self.buf.read_exact(&mut _skip).ok()?;
 
@@ -85,7 +88,7 @@ impl<'a> Iterator for ChunkedDecoder<'a> {
         }))
     }
 }
-impl<'a> BodyDecoder for ChunkedDecoder<'a> {}
+impl<A: BufRead> BodyDecoder for ChunkedDecoder<A> {}
 
 #[cfg(test)]
 mod test {

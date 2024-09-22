@@ -1,6 +1,7 @@
 pub mod body;
 pub mod chunked;
 
+use body::{Body, BodyDecoder};
 use chunked::ChunkedDecoder;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
@@ -18,7 +19,7 @@ pub enum HttpVersion {
 
 pub struct Request<'a> {
     pub headers: Option<HashMap<String, String>>,
-    pub body: Option<Vec<u8>>,
+    pub body: Option<Box<dyn BodyDecoder + 'a>>,
     pub path: String,
 
     #[allow(dead_code)]
@@ -105,7 +106,7 @@ impl FromStr for Method {
 }
 
 impl<'a> Request<'a> {
-    pub fn from(stream: &TcpStream) -> Result<Self, String> {
+    pub fn from(stream: &'a TcpStream) -> Result<Self, String> {
         // TODO: Support url-encoding
         let mut buf = BufReader::new(stream);
         let mut lines = buf.by_ref().lines();
@@ -142,30 +143,21 @@ impl<'a> Request<'a> {
                 Some(map)
             }
         };
-        // TODO: Handle Transfer-Encoding: Chunked
-        let body = match headers {
+
+        let body: Option<Box<dyn BodyDecoder>> = match headers {
             None => None,
             Some(ref headers) => {
                 if let Some(length) = headers.get("Content-Length") {
                     // TODO: Handle isize::MAX and a max body size.
-                    let length = length
+                    let length: usize = length
                         .parse()
                         .map_err(|_| "Content-Length is not a number")?;
-                    let mut body = vec![0; length];
-                    buf.read_exact(&mut body).map_err(|_| "Expected a body")?;
-                    Some(body)
+                    Some(Box::new(Body::new(length, buf)))
                 } else if let Some(encoding) =
                     headers.get("Transfer-Encoding").map(|h| h.to_lowercase())
                 {
-                    // TODO: body should be a buffer and it's up to `self.handler` read the chunks.
                     if encoding.as_str() == "chunked" {
-                        let mut body: Vec<u8> = Vec::new();
-                        ChunkedDecoder::new(&mut buf)
-                            .filter_map(Result::ok)
-                            .for_each(|mut c| {
-                                body.append(&mut c.buf);
-                            });
-                        Some(body)
+                        Some(Box::new(ChunkedDecoder::new(buf)))
                     } else {
                         None
                     }

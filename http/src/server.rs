@@ -3,11 +3,11 @@ use super::response::Response;
 use std::io::{BufWriter, Write};
 use std::net::{TcpListener, ToSocketAddrs};
 
-pub type Handler = Option<Box<dyn Fn(&Request) -> Response>>;
+pub type Handler = Option<Box<dyn Fn(&mut Request) -> Response>>;
 
 pub struct Server {
     listener: TcpListener,
-    handler: Handler
+    handler: Handler,
 }
 
 impl Server {
@@ -23,10 +23,10 @@ impl Server {
         for stream in self.listener.incoming() {
             let stream = stream?;
             let mut writer = BufWriter::new(&stream);
-            let request = Request::from(&stream).unwrap();
+            let mut request = Request::from(&stream).unwrap();
 
             if let Some(handler) = &self.handler {
-                let response = handler(&request);
+                let response = handler(&mut request);
 
                 let mut headers = response.headers.headers;
                 if !headers.is_empty() {
@@ -54,7 +54,7 @@ impl Server {
 
     pub fn on_request<F>(&mut self, handler: F) -> &mut Self
     where
-        F: Fn(&Request) -> Response + 'static,
+        F: Fn(&mut Request) -> Response + 'static,
     {
         self.handler = Some(Box::new(handler));
         self

@@ -5,7 +5,7 @@ use http::{
 };
 use std::fs;
 
-fn headers(request: &Request) -> Response {
+fn headers(request: &mut Request) -> Response {
     match (request.path.as_str(), &request.method) {
         ("/headers", Method::Get) => Response {
             body: fs::read("example/src/static/headers.html").expect("ON"),
@@ -18,7 +18,7 @@ fn headers(request: &Request) -> Response {
             Vec::new(),
         ),
         ("/headers", Method::Post) => {
-            let body = request.body.clone().unwrap_or_else(|| "Nothing".into());
+            let body = request.body.as_mut().unwrap().all_bytes();
             let body = String::from_utf8(body).unwrap_or_else(|_| "not utf8".to_string());
 
             let content_type = request
