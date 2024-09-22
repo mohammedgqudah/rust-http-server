@@ -40,6 +40,6 @@ fn main() {
 ```
 
 # Roadmap
-- [ ] Complete HTTP parser
+- [ ] A complete HTTP/1 and HTTP/1.1 parser
 - [ ] TLS
-- [ ] Path variables
+- [ ] HTTP/2 Implementation
