@@ -1,9 +1,8 @@
-/// Chunked Transfer Decoder
-/// RFC: https://datatracker.ietf.org/doc/html/rfc9112#section-7.1
-///
 use super::body::{BodyDecoder, Chunk};
 use std::io::BufRead;
 
+/// A Chunked Transfer Decoder
+/// RFC: <https://datatracker.ietf.org/doc/html/rfc9112#section-7.1>
 pub struct ChunkedDecoder<A: BufRead> {
     buf: A,
     stopped: bool,

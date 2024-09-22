@@ -1,7 +1,7 @@
 pub mod body;
 pub mod chunked;
 
-use body::{BodyDecoder, Chunk};
+use body::{Body, BodyDecoder};
 use chunked::ChunkedDecoder;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
@@ -104,50 +104,6 @@ impl FromStr for Method {
         }
     }
 }
-
-struct Body<B: BufRead> {
-    buf: B,
-    length: usize,
-    done: bool,
-}
-
-impl<B: BufRead> Body<B> {
-    fn new(length: usize, buf: B) -> Self {
-        Body {
-            buf,
-            length,
-            done: false,
-        }
-    }
-}
-
-impl<B: BufRead> Iterator for Body<B> {
-    type Item = Result<Chunk, &'static str>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.done {
-            return None;
-        }
-
-        let mut chunk = Chunk {
-            buf: vec![0; self.length],
-            extension: String::new(),
-        };
-
-        match self.buf.read_exact(&mut chunk.buf) {
-            Ok(_) => {}
-            Err(_) => {
-                self.done = true;
-                return Some(Err("Expected a body"));
-            }
-        };
-
-        self.done = true;
-        Some(Ok(chunk))
-    }
-}
-
-impl<B: BufRead> BodyDecoder for Body<B> {}
 
 impl<'a> Request<'a> {
     pub fn from(stream: &'a TcpStream) -> Result<Self, String> {
