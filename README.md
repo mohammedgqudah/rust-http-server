@@ -10,7 +10,7 @@ use http::{
 };
 use std::fs;
 
-fn headers(request: &Request) -> String {
+fn headers(request: &Request) -> Response {
     match (request.path.as_str(), &request.method) {
         ("/", Method::GET) => Response {
             body: fs::read("src/static/headers.html").expect("ON"),
