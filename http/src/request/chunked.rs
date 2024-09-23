@@ -61,11 +61,10 @@ impl<A: BufRead> Iterator for ChunkedDecoder<A> {
             }
         };
 
-        // TODO: Instead of stopping the iterator,
-        // an empty chunk should be returned. This is because the last chunk
-        // is allowed to have an extension, which may be relevant to the handler.
+        // If the chunk size is zero, mark the iterator as `stopped` but still return an empty chunk.
+        // The last chunk signals the end of the stream, but may include an extension.
         if chunk_size == 0 {
-            return None;
+            self.stopped = true;
         }
 
         let mut chunk = vec![0; chunk_size];
@@ -105,6 +104,10 @@ mod test {
             Chunk {
                 buf: "This is exactly 18".as_bytes().to_vec(),
                 extension: "one_key".to_string(),
+            },
+            Chunk {
+                buf: vec![],
+                extension: "".to_string(),
             },
         ];
         let body = String::from(
@@ -153,5 +156,38 @@ ignored
         );
         assert_eq!(Err("Invalid chunk size"), decoder.next().unwrap());
         assert_eq!(None, decoder.next());
+    }
+
+    #[test]
+    fn it_accepts_an_extension_for_the_last_chunk() {
+        let expected = vec![
+            Chunk {
+                buf: "Hello".as_bytes().to_vec(),
+                extension: "name_only;key1=value1".to_string(),
+            },
+            Chunk {
+                buf: "This is exactly 18".as_bytes().to_vec(),
+                extension: "one_key".to_string(),
+            },
+            Chunk {
+                buf: vec![],
+                extension: "progress=100".to_string(),
+            },
+        ];
+        let body = String::from(
+            r"5; name_only;key1=value1 
+Hello
+12; one_key
+This is exactly 18
+0;progress=100
+
+",
+        )
+        .replace("\n", "\r\n");
+        let cursor = Cursor::new(body.into_bytes());
+        let mut buf = BufReader::new(cursor);
+        let decoder = ChunkedDecoder::new(&mut buf);
+        let chunks: Vec<Chunk> = decoder.map(|c| c.unwrap()).collect();
+        assert_eq!(expected, chunks);
     }
 }
