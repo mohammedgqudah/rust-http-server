@@ -27,7 +27,12 @@ jobs:
       - name: Run cargo bench
         id: run-bench
         run: |
-          cargo bench 2>/dev/null | grep -v "ignored" || echo "Benchmark failed"
+          cargo bench 2>/dev/null | grep -v "ignored" > output.txt || echo "Benchmark failed"
+          output=$(cat output.txt)
+          echo "output<<EOF" >> $GITHUB_ENV
+          echo "$output" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
 
       # Post results as a comment on the PR
       - name: Post benchmark results
@@ -38,6 +43,6 @@ jobs:
           body: |
             Benchmark Results for Commit `${{ github.sha }}`
             ```
-            ${{ join(steps.run-bench.outputs.*, '\n') }}
+            ${{ env.output }}
             ```
 
