@@ -1,0 +1,39 @@
+name: Benchmark
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  run-benchmarks:
+    if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/bench'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - name: Run cargo bench
+        id: run-bench
+        run: |
+          cargo bench 2>/dev/null | grep -v "ignored" || echo "Benchmark failed"
+
+      # Post results as a comment on the PR
+      - name: Post benchmark results
+        if: success() || failure()
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number || github.event.issue.number }}
+          body: |
+            ## Benchmark Results for Commit `${{ github.sha }}`
+            ```
+            ${{ steps.run-bench.outputs.stdout }}
+            ```
+
