@@ -36,8 +36,8 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number || github.event.issue.number }}
           body: |
-            ## Benchmark Results for Commit `${{ github.sha }}`
+            Benchmark Results for Commit `${{ github.sha }}`
             ```
-            ${{ steps.run-bench.outputs.stdout }}
+            ${{ steps.run-bench.outputs.* }}
             ```
 
