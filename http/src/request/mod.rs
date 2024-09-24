@@ -5,27 +5,15 @@ use body::{Body, BodyDecoder};
 use chunked::ChunkedDecoder;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
-use std::net::TcpStream;
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum HttpVersion {
     V0_9,
     V1_0,
     V1_1,
     V2_0,
     V3_0,
-}
-
-pub struct Request<'a> {
-    pub headers: Option<HashMap<String, String>>,
-    pub body: Option<Box<dyn BodyDecoder + 'a>>,
-    pub path: String,
-
-    #[allow(dead_code)]
-    pub query_string: &'a str,
-    pub http_version: HttpVersion,
-    pub method: Method,
 }
 
 impl std::fmt::Display for HttpVersion {
@@ -59,7 +47,7 @@ impl FromStr for HttpVersion {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Method {
     Head,
     Get,
@@ -105,8 +93,34 @@ impl FromStr for Method {
     }
 }
 
+/// Headers that are relevant the server e.g. (Content-Length, Connection).
+struct InternalHeaders {
+    content_length: Option<String>,
+    transfer_encoding: Option<String>,
+}
+
+impl InternalHeaders {
+    fn new() -> Self {
+        InternalHeaders {
+            content_length: None,
+            transfer_encoding: None,
+        }
+    }
+}
+
+pub struct Request<'a> {
+    pub headers: Option<HashMap<String, String>>,
+    pub body: Option<Box<dyn BodyDecoder + 'a>>,
+    pub path: String,
+
+    #[allow(dead_code)]
+    pub query_string: &'a str,
+    pub http_version: HttpVersion,
+    pub method: Method,
+}
+
 impl<'a> Request<'a> {
-    pub fn from(stream: &'a TcpStream) -> Result<Self, String> {
+    pub fn from<R: Read + 'a>(stream: R) -> Result<Self, String> {
         // TODO: Support url-encoding
         let mut buf = BufReader::new(stream);
         let mut lines = buf.by_ref().lines();
@@ -194,4 +208,129 @@ fn parse_request_line(
     let version = HttpVersion::from_str(parts[2])?;
 
     Ok((method, path.to_string(), version))
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+    use super::{HttpVersion, Method, Request};
+    use std::io::Cursor;
+    use test::{black_box, Bencher};
+
+    #[test]
+    fn it_parses_the_correct_version() {
+        assert_eq!(
+            HttpVersion::V1_0,
+            Request::from(Cursor::new("GET / HTTP/1.0\r\n\r\n"))
+                .unwrap()
+                .http_version
+        );
+        assert_eq!(
+            HttpVersion::V1_1,
+            Request::from(Cursor::new("GET / HTTP/1.1\r\n\r\n"))
+                .unwrap()
+                .http_version
+        );
+        assert_eq!(
+            HttpVersion::V0_9,
+            Request::from(Cursor::new("GET / HTTP/0.9\r\n\r\n"))
+                .unwrap()
+                .http_version
+        );
+    }
+
+    #[test]
+    fn it_parses_the_correct_method() {
+        assert_eq!(
+            Method::Get,
+            Request::from(Cursor::new("GET / HTTP/1.1\r\n\r\n"))
+                .unwrap()
+                .method
+        );
+        assert_eq!(
+            Method::Post,
+            Request::from(Cursor::new("POST / HTTP/1.1\r\n\r\n"))
+                .unwrap()
+                .method
+        );
+        assert_eq!(
+            Method::Head,
+            Request::from(Cursor::new("HEAD / HTTP/1.1\r\n\r\n"))
+                .unwrap()
+                .method
+        );
+        assert_eq!(
+            Method::Put,
+            Request::from(Cursor::new("PUT / HTTP/1.1\r\n\r\n"))
+                .unwrap()
+                .method
+        );
+        assert_eq!(
+            Method::Patch,
+            Request::from(Cursor::new("PATCH / HTTP/1.1\r\n\r\n"))
+                .unwrap()
+                .method
+        );
+    }
+
+    #[test]
+    fn it_parses_a_get_request() {
+        let body = String::from("GET / HTTP/1.1\r\n\r\n");
+        let request = Request::from(Cursor::new(body));
+        let request = request.unwrap();
+
+        assert_eq!(Method::Get, request.method);
+        assert_eq!(HttpVersion::V1_1, request.http_version);
+        assert_eq!(None, request.headers);
+        assert_eq!("/".to_string(), request.path);
+    }
+
+    #[test]
+    fn it_parses_a_get_request_with_headers() {
+        let body = String::from(
+            "GET / HTTP/1.1\r\nHost: localhost:80\r\nUser-Agent: rust\r\n\r\n",
+        );
+        let request = Request::from(Cursor::new(body));
+        let request = request.unwrap();
+
+        assert_eq!(Method::Get, request.method);
+        assert_eq!(HttpVersion::V1_1, request.http_version);
+        assert!(request.headers.is_some());
+        assert_eq!("/".to_string(), request.path);
+    }
+
+    #[test]
+    fn it_parses_a_post_request_with_body() {
+        let body = String::from("POST / HTTP/1.1\r\nHost: localhost:80\r\nContent-Length: 10\r\n\r\n0123456789");
+        let request = Request::from(Cursor::new(body));
+        let request = request.unwrap();
+
+        assert_eq!(Method::Post, request.method);
+        assert_eq!(HttpVersion::V1_1, request.http_version);
+        assert!(request.headers.is_some());
+        assert_eq!("/".to_string(), request.path);
+        assert_eq!(
+            "0123456789".to_string(),
+            String::from_utf8(request.body.unwrap().all_bytes()).unwrap()
+        );
+    }
+
+    // BENCHMARKS
+    //
+    #[bench]
+    fn bench_parse_get_request(b: &mut Bencher) {
+        let body = String::from(
+            "GET / HTTP/1.1\r\nHost: localhost:80\r\nUser-Agent: rust\r\n\r\n",
+        );
+        b.iter(|| Request::from(Cursor::new(&body)).unwrap())
+    }
+
+    #[bench]
+    fn bench_parse_post_request(b: &mut Bencher) {
+        let body = String::from("POST / HTTP/1.1\r\nHost: localhost:80\r\nContent-Length: 10\r\n\r\n0123456789");
+        b.iter(|| {
+            let request = Request::from(Cursor::new(&body)).unwrap();
+            black_box(request.body.unwrap().all_bytes());
+        })
+    }
 }
