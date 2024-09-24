@@ -38,6 +38,6 @@ jobs:
           body: |
             Benchmark Results for Commit `${{ github.sha }}`
             ```
-            ${{ steps.run-bench.outputs.* }}
+            ${{ join(steps.run-bench.outputs.*, '\n') }}
             ```
 
