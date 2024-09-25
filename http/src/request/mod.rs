@@ -197,15 +197,17 @@ impl<'a> Request<'a> {
 fn parse_request_line(
     request_line: &str,
 ) -> Result<(Method, String, HttpVersion), &'static str> {
-    let parts: Vec<_> = request_line.split_ascii_whitespace().collect();
+    let mut parts = request_line.splitn(3, ' ');
 
-    if parts.len() != 3 {
-        return Err("Invalid request line");
-    }
-
-    let method = Method::from_str(parts[0])?;
-    let path = parts[1];
-    let version = HttpVersion::from_str(parts[2])?;
+    let method = parts
+        .next()
+        .and_then(|m| Method::from_str(m).ok())
+        .ok_or("Invalid request line")?;
+    let path = parts.next().ok_or("Invalid request line")?;
+    let version = parts
+        .next()
+        .and_then(|v| HttpVersion::from_str(v).ok())
+        .ok_or("Invalid request line")?;
 
     Ok((method, path.to_string(), version))
 }
