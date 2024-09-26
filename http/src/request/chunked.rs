@@ -1,8 +1,11 @@
+#![allow(clippy::all)]
+
 use super::body::{BodyDecoder, Chunk};
 use std::io::BufRead;
 
 /// A Chunked Transfer Decoder
 /// RFC: <https://datatracker.ietf.org/doc/html/rfc9112#section-7.1>
+#[expect(clippy::module_name_repetitions)]
 pub struct ChunkedDecoder<A: BufRead> {
     buf: A,
     stopped: bool,
@@ -29,12 +32,9 @@ impl<A: BufRead> Iterator for ChunkedDecoder<A> {
 
         let mut line = String::new();
 
-        match self.buf.read_line(&mut line) {
-            Ok(_) => {}
-            Err(_) => {
-                self.stopped = true;
-                return Some(Err("Expected chunk size"));
-            }
+        if let Err(_) = self.buf.read_line(&mut line) {
+            self.stopped = true;
+            return Some(Err("Expected chunk size"));
         };
 
         let line = line.trim();
@@ -53,12 +53,12 @@ impl<A: BufRead> Iterator for ChunkedDecoder<A> {
             Some((length, extension)) => (length.trim(), extension.trim()),
         };
 
-        let chunk_size = match u64::from_str_radix(length, 16) {
-            Ok(size) => size as usize,
-            Err(_) => {
-                self.stopped = true;
-                return Some(Err("Invalid chunk size"));
-            }
+        #[allow(clippy::cast_possible_truncation)]
+        let chunk_size = if let Ok(size) = u64::from_str_radix(length, 16) {
+            size as usize
+        } else {
+            self.stopped = true;
+            return Some(Err("Invalid chunk size"));
         };
 
         // If the chunk size is zero, mark the iterator as `stopped` but still return an empty chunk.
@@ -69,17 +69,14 @@ impl<A: BufRead> Iterator for ChunkedDecoder<A> {
 
         let mut chunk = vec![0; chunk_size];
 
-        match self.buf.read_exact(&mut chunk) {
-            Ok(_) => {}
-            Err(_) => {
-                self.stopped = true;
-                return Some(Err("Expected a chunk"));
-            }
+        if let Err(_) = self.buf.read_exact(&mut chunk) {
+            self.stopped = true;
+            return Some(Err("Expected a chunk"));
         };
 
         // Read CR LF
-        let mut _skip = [0; 2];
-        self.buf.read_exact(&mut _skip).ok()?;
+        let mut skip = [0; 2];
+        self.buf.read_exact(&mut skip).ok()?;
 
         Some(Ok(Chunk {
             buf: chunk,
@@ -91,6 +88,7 @@ impl<A: BufRead> BodyDecoder for ChunkedDecoder<A> {}
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::unwrap_used)]
     use super::*;
     use std::io::{BufReader, Cursor};
 
@@ -107,7 +105,7 @@ mod test {
             },
             Chunk {
                 buf: vec![],
-                extension: "".to_string(),
+                extension: String::new(),
             },
         ];
         let body = String::from(
@@ -119,7 +117,7 @@ This is exactly 18
 
 ",
         )
-        .replace("\n", "\r\n");
+        .replace('\n', "\r\n");
         let cursor = Cursor::new(body.into_bytes());
         let mut buf = BufReader::new(cursor);
         let decoder = ChunkedDecoder::new(&mut buf);
@@ -140,7 +138,7 @@ ignored
 
 ",
         )
-        .replace("\n", "\r\n");
+        .replace('\n', "\r\n");
         let cursor = Cursor::new(body.into_bytes());
         let mut buf = BufReader::new(cursor);
         let mut decoder = ChunkedDecoder::new(&mut buf);
@@ -149,6 +147,7 @@ ignored
                 buf: "Hello".as_bytes().to_vec(),
                 extension: String::new(),
             },
+            #[expect(clippy::expect_used)]
             decoder
                 .next()
                 .expect("The first chunk was not parsed")
@@ -183,7 +182,7 @@ This is exactly 18
 
 ",
         )
-        .replace("\n", "\r\n");
+        .replace('\n', "\r\n");
         let cursor = Cursor::new(body.into_bytes());
         let mut buf = BufReader::new(cursor);
         let decoder = ChunkedDecoder::new(&mut buf);

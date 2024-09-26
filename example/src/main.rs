@@ -6,7 +6,7 @@ use http::{
 use std::fs;
 
 fn headers(request: &mut Request) -> Response {
-    match (request.path.as_str(), &request.method) {
+    match (request.path(), &request.method) {
         ("/headers", Method::Get) => Response {
             body: fs::read("example/src/static/headers.html").expect("ON"),
             headers: Headers::new("X-Server: RustHTTP"),
@@ -45,7 +45,7 @@ fn headers(request: &mut Request) -> Response {
             }
         }
         _ => Response {
-            body: format!("<h1>{} Not Found</h1>", request.path)
+            body: format!("<h1>{} Not Found</h1>", request.path())
                 .as_bytes()
                 .to_vec(),
             headers: Headers {
@@ -56,6 +56,6 @@ fn headers(request: &mut Request) -> Response {
     }
 }
 fn main() {
-    let mut server = Server::new("0.0.0.0:4000");
-    let _ = server.on_request(headers).listen();
+    let server = Server::new("0.0.0.0:4000", headers);
+    server.listen().unwrap();
 }

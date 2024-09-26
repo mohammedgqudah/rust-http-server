@@ -8,6 +8,7 @@ pub struct Chunk {
 }
 
 #[allow(dead_code)]
+#[expect(clippy::module_name_repetitions)]
 pub trait BodyDecoder: Iterator<Item = Result<Chunk, &'static str>> {
     fn all_bytes(&mut self) -> Vec<u8> {
         let mut res = Vec::new();
@@ -52,12 +53,9 @@ impl<B: BufRead> Iterator for Body<B> {
             extension: String::new(),
         };
 
-        match self.buf.read_exact(&mut chunk.buf) {
-            Ok(_) => {}
-            Err(_) => {
-                self.done = true;
-                return Some(Err("Expected a body"));
-            }
+        if self.buf.read_exact(&mut chunk.buf).is_err() {
+            self.done = true;
+            return Some(Err("Expected a body"));
         };
 
         self.done = true;

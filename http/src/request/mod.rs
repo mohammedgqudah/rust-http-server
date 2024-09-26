@@ -109,9 +109,10 @@ impl InternalHeaders {
 }
 
 pub struct Request<'a> {
+    request_line: String,
     pub headers: Option<HashMap<String, String>>,
     pub body: Option<Box<dyn BodyDecoder + 'a>>,
-    pub path: String,
+    path_slice: std::ops::Range<usize>,
 
     #[allow(dead_code)]
     pub query_string: &'a str,
@@ -120,6 +121,19 @@ pub struct Request<'a> {
 }
 
 impl<'a> Request<'a> {
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.request_line[self.path_slice.clone()]
+    }
+
+    /// # Panics
+    ///
+    /// Will panic if the buffer can't read lines until CRLF CRLF, will change in the future.
+    ///
+    /// # Errors
+    ///
+    /// Will error if Content-Length is not a number.
+    /// Will error if the chunk size is not a hex number.
     pub fn from<R: Read + 'a>(stream: R) -> Result<Self, String> {
         // TODO: Support url-encoding
         let mut buf = BufReader::new(stream);
@@ -130,6 +144,7 @@ impl<'a> Request<'a> {
             .ok_or("Expected request line")?
             .map_err(|_| "Couldn't get request line")?;
 
+        #[expect(clippy::unwrap_used)]
         let mut lines = lines
             // TODO: don't use unwrap
             .take_while(|line| !line.as_ref().unwrap().is_empty())
@@ -138,24 +153,23 @@ impl<'a> Request<'a> {
         // TODO: Parse headers only when asked to.
         // This will pose a challenge to internally used headers such as Content-Length,
         // but this can be solved by saving the headers we're interested in as a variable or struct.
-        let headers = match lines.peek() {
-            None => None,
-            Some(_) => {
-                let mut map: HashMap<String, String> = HashMap::new();
-                lines.try_for_each(|line| -> Result<(), String> {
-                    let binding = line.map_err(|_| "Expected a header".to_string())?;
-                    let mut pair = binding.split(':');
-                    if let (Some(key), Some(value)) = (pair.next(), pair.next()) {
-                        // TODO: Store headers in lower-case.
-                        // TODO: Store both `Referer` and `Referrer`
-                        map.insert(key.to_string(), value.trim().to_string());
-                        Ok(())
-                    } else {
-                        Err("Malformed HTTP header".to_string())
-                    }
-                })?;
-                Some(map)
-            }
+        let headers = if lines.peek().is_none() {
+            None
+        } else {
+            let mut map: HashMap<String, String> = HashMap::new();
+            lines.try_for_each(|line| -> Result<(), String> {
+                let binding = line.map_err(|_| "Expected a header".to_string())?;
+                let mut pair = binding.split(':');
+                if let (Some(key), Some(value)) = (pair.next(), pair.next()) {
+                    // TODO: Store headers in lower-case.
+                    // TODO: Store both `Referer` and `Referrer`
+                    map.insert(key.to_string(), value.trim().to_string());
+                    Ok(())
+                } else {
+                    Err("Malformed HTTP header".to_string())
+                }
+            })?;
+            Some(map)
         };
 
         let body: Option<Box<dyn BodyDecoder>> = match headers {
@@ -184,9 +198,10 @@ impl<'a> Request<'a> {
         let (method, uri, version) = parse_request_line(&request_line)?;
 
         Ok(Request {
+            request_line,
             headers,
             body,
-            path: uri,
+            path_slice: uri,
             query_string: "",
             http_version: version,
             method,
@@ -196,7 +211,7 @@ impl<'a> Request<'a> {
 
 fn parse_request_line(
     request_line: &str,
-) -> Result<(Method, String, HttpVersion), &'static str> {
+) -> Result<(Method, std::ops::Range<usize>, HttpVersion), &'static str> {
     let mut parts = request_line.splitn(3, ' ');
 
     let method = parts
@@ -209,11 +224,19 @@ fn parse_request_line(
         .and_then(|v| HttpVersion::from_str(v).ok())
         .ok_or("Invalid request line")?;
 
-    Ok((method, path.to_string(), version))
+    #[expect(clippy::expect_used)]
+    Ok((
+        method,
+        request_line.substr_range(path).expect(
+            "Range should always be `Some` due to `path` being a slice of `request_line`",
+        ),
+        version,
+    ))
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
     extern crate test;
     use super::{HttpVersion, Method, Request};
     use std::io::Cursor;
@@ -284,7 +307,7 @@ mod tests {
         assert_eq!(Method::Get, request.method);
         assert_eq!(HttpVersion::V1_1, request.http_version);
         assert_eq!(None, request.headers);
-        assert_eq!("/".to_string(), request.path);
+        assert_eq!("/".to_string(), request.path());
     }
 
     #[test]
@@ -298,7 +321,7 @@ mod tests {
         assert_eq!(Method::Get, request.method);
         assert_eq!(HttpVersion::V1_1, request.http_version);
         assert!(request.headers.is_some());
-        assert_eq!("/".to_string(), request.path);
+        assert_eq!("/".to_string(), request.path());
     }
 
     #[test]
@@ -310,7 +333,7 @@ mod tests {
         assert_eq!(Method::Post, request.method);
         assert_eq!(HttpVersion::V1_1, request.http_version);
         assert!(request.headers.is_some());
-        assert_eq!("/".to_string(), request.path);
+        assert_eq!("/".to_string(), request.path());
         assert_eq!(
             "0123456789".to_string(),
             String::from_utf8(request.body.unwrap().all_bytes()).unwrap()
@@ -324,7 +347,7 @@ mod tests {
         let body = String::from(
             "GET / HTTP/1.1\r\nHost: localhost:80\r\nUser-Agent: rust\r\n\r\n",
         );
-        b.iter(|| Request::from(Cursor::new(&body)).unwrap())
+        b.iter(|| Request::from(Cursor::new(&body)).unwrap());
     }
 
     #[bench]
@@ -333,6 +356,6 @@ mod tests {
         b.iter(|| {
             let request = Request::from(Cursor::new(&body)).unwrap();
             black_box(request.body.unwrap().all_bytes());
-        })
+        });
     }
 }

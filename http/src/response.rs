@@ -7,16 +7,18 @@ pub struct Headers {
 
 impl Headers {
     #[allow(dead_code)]
+    #[must_use]
     pub fn from_hash_map(map: &HashMap<String, String>) -> Self {
         let headers = map
             .iter()
-            .map(|(k, v)| format!("{}: {}", k, v))
+            .map(|(k, v)| format!("{k}: {v}"))
             .collect::<Vec<_>>()
             .join(", ");
 
         Self::new(&headers)
     }
 
+    #[must_use]
     pub fn new(headers: &str) -> Self {
         Headers {
             headers: headers.to_string(),
@@ -163,7 +165,7 @@ impl fmt::Display for Status {
             Status::NotExtended => "Not Extended",
             Status::NetworkAuthenticationRequired => "Network Authentication Required",
         };
-        write!(f, "{}", description)
+        write!(f, "{description}")
     }
 }
 pub struct Response {
@@ -173,6 +175,7 @@ pub struct Response {
 }
 
 impl Response {
+    #[must_use]
     pub fn new(status: Status, headers: Headers, body: Vec<u8>) -> Self {
         Response {
             headers,
