@@ -93,21 +93,6 @@ impl FromStr for Method {
     }
 }
 
-/// Headers that are relevant the server e.g. (Content-Length, Connection).
-struct InternalHeaders {
-    content_length: Option<String>,
-    transfer_encoding: Option<String>,
-}
-
-impl InternalHeaders {
-    fn new() -> Self {
-        InternalHeaders {
-            content_length: None,
-            transfer_encoding: None,
-        }
-    }
-}
-
 pub struct Request<'a> {
     request_line: String,
     pub headers: Option<HashMap<String, String>>,
