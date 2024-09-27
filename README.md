@@ -40,6 +40,9 @@ fn main() {
 ```
 
 # Roadmap
+- [ ] A single-thread blocking version
+- [ ] A thread pool version
+- [ ] A non-blocking single-thread version
 - [ ] A complete HTTP/1 and HTTP/1.1 parser
 - [ ] TLS
 - [ ] HTTP/2 Implementation
