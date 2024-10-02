@@ -56,6 +56,6 @@ fn headers(request: &mut Request) -> Response {
     }
 }
 fn main() {
-    let server = Server::new("0.0.0.0:4000", headers);
+    let server = Server::threaded("0.0.0.0:4000", headers, 10);
     server.listen().unwrap();
 }
