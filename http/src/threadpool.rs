@@ -26,7 +26,7 @@ pub struct ThreadPool {
 impl ThreadPool {
     /// # Panics
     ///
-    /// Panics if a threaded couldn't be spawned.
+    /// Panics if a thread cannot be spawned.
     #[must_use]
     pub fn new(count: usize) -> ThreadPool {
         let mut workers = Vec::with_capacity(count);
@@ -56,7 +56,7 @@ impl ThreadPool {
 
     /// # Errors
     ///
-    /// Errors if the job could not be sent to the mpsc channel.
+    /// Errors if the job cannot  be sent to the mpsc channel.
     ///
     /// # Panics
     ///
