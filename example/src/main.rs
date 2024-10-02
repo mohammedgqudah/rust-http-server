@@ -1,3 +1,4 @@
+use clap::Parser;
 use http::{
     request::{Method, Request},
     response::{Headers, Response, Status},
@@ -55,7 +56,24 @@ fn headers(request: &mut Request) -> Response {
         },
     }
 }
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Thread pool size (enable threading with --threading)
+    #[arg(short = 'c', long, default_value_t = 50)]
+    threads_count: usize,
+
+    #[arg(short, long)]
+    threaded: bool,
+}
+
 fn main() {
-    let server = Server::new("0.0.0.0:4000", headers);
+    let args = Args::parse();
+    let server = if args.threaded {
+        Server::threaded("0.0.0.0:4000", headers, args.threads_count)
+    } else {
+        Server::new("0.0.0.0:4000", headers)
+    };
     server.listen().unwrap();
 }
